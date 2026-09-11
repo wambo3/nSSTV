@@ -305,7 +305,7 @@ nsstv bench photo.jpg  # rank them by quality on your image
 
 ---
 
-## Python API
+## Python Usage
 
 ```python
 nSSTV.encode("photo.jpg")               # → photo_sstv.wav
