@@ -22,7 +22,7 @@ image is painted one line at a time.
 
 - **Encode** any image into SSTV audio (WAV or MP3)
 - **Decode** SSTV audio back into images, with automatic mode detection
-- **28 modes** — Martin, Scottie, Robot, PD, Pasokon, and Wraase families
+- **Support for multiple modes** — Martin, Scottie, Robot, PD, and Wraase families
 - **Decode-all** — pull every transmission out of one long recording
 - **Batch decode** — process an entire folder of recordings at once
 - **Live capture** — record from a mic or audio cable, then decode
