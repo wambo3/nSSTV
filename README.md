@@ -328,7 +328,7 @@ Handy extras:
 ```python
 nSSTV.cut("tx.wav", 16.0)                       # first 16s → tx_cut.wav
 nSSTV.join(["a.wav", "b.wav"], gap=5.0)         # join with silence between
-nSSTV.add_caption_to_image("in.jpg", "out.jpg", text="NANA - GHANA")
+nSSTV.add_caption_to_image("in.jpg", "out.jpg", text="NANA")
 nSSTV.random_modes(4, seed=7)                   # repeatable random mode pick
 ```
 
