@@ -280,7 +280,7 @@ nsstv decode input.wav --output-mode all
 
 ---
 
-## Image fit: no more stretched photos
+## Image fit
 
 Every SSTV mode has fixed dimensions (PD-180 is always 640×496), so nSSTV fits
 your photo instead of squashing it:
@@ -293,6 +293,41 @@ your photo instead of squashing it:
 nsstv encode portrait.jpg --mode PD-180 --fit cover
 nsstv encode portrait.jpg --mode PD-180 --fit contain --background 255,255,255
 ```
+
+---
+
+## Experimental modes
+
+Five modes are marked **experimental**. They still encode, decode and show up
+in `nsstv modes` (with an `experimental` tag), but treat their results with care:
+
+| Mode | VIS | Experimental scope |
+|------|-----|--------------------|
+| Pasokon P3 | 113 | everywhere |
+| Pasokon P5 | 114 | everywhere |
+| Pasokon P7 | 115 | everywhere |
+| PD-50 | 93 | everywhere |
+| Scottie DX | 76 | `decode-all` only |
+
+- **Pasokon P3/P5/P7 and PD-50** — the layouts are unverified and decodes may
+  be unreliable. Their VIS codes stay in the table on purpose: when a Pasokon
+  or PD-50 signal appears, nSSTV can name it and say "experimental" instead of
+  failing to recognize it.
+- **Scottie DX** — plain encode and decode are fine, but inside `decode-all`
+  its very long lines make it easy to misjudge in a recording that holds
+  several transmissions, so the scanner flags it.
+
+`bench` skips experimental modes by default. Name one explicitly or pass
+`--include-experimental` to bench them anyway:
+
+```bash
+nsstv bench photo.jpg --modes "PD-50"          # bench one experimental mode
+nsstv bench photo.jpg --include-experimental   # bench all modes, experimental included
+```
+
+When a decode detects an experimental mode, the result carries
+`"experimental": true` plus a short notice; `decode-all` adds the same flag to
+each affected transmission and to the summary.
 
 ---
 
