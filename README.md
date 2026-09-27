@@ -6,11 +6,9 @@
   Turn images into SSTV radio audio, and SSTV audio back into images
 </p>
 
-
 # nSSTV
 
 A Python SSTV encoder/decoder for turning images into WAV/MP3 audio and SSTV audio back into images.
-
 
 ## What is SSTV?
 
@@ -20,20 +18,21 @@ image is painted one line at a time.
 
 ## Features
 
-- **Encode** any image into SSTV audio (WAV or MP3)
-- **Decode** SSTV audio back into images, with automatic mode detection
-- **Support for multiple modes** — Martin, Scottie, Robot, PD, and Wraase families
-- **Decode-all** — pull every transmission out of one long recording
-- **Batch decode** — process an entire folder of recordings at once
-- **Live capture** — record from a mic or audio cable, then decode
-- **Smart image fit** — `contain`, `cover`, or `stretch` so photos aren't squashed
-- **Output styles** — raw, Polaroid frame, spectrogram, or stacked, with optional captions
-- **Diagnostics** — annotated spectrograms showing leader, VIS, and image boundaries
-- **Quality metrics** — MAE, PSNR, and correlation on every roundtrip
-- **Benchmarking** — rank every mode by quality on your own image
-- **Custom modes** — define your own from Python or JSON
-- **Cleanup tools** — auto-levels and denoise presets for noisy recordings
-- **Test cards** — generate calibrated test images for any mode
+* **Encode** any image into SSTV audio (WAV or MP3)
+* **Decode** SSTV audio back into images, with automatic mode detection
+* **Support for multiple modes** — Martin, Scottie, Robot, PD, and Wraase families
+* **Decode-all** — pull every transmission out of one long recording
+* **Batch decode** — process an entire folder of recordings at once
+* **Live capture** — record from a mic or audio cable, then decode
+* **Rig control** — optional Hamlib hooks for tuning, PTT, frequency readback, and transmit/receive workflows
+* **Smart image fit** — `contain`, `cover`, or `stretch` so photos aren't squashed
+* **Output styles** — raw, Polaroid frame, spectrogram, or stacked, with optional captions
+* **Diagnostics** — annotated spectrograms showing leader, VIS, and image boundaries
+* **Quality metrics** — MAE, PSNR, and correlation on every roundtrip
+* **Benchmarking** — rank every mode by quality on your own image
+* **Custom modes** — define your own from Python or JSON
+* **Cleanup tools** — auto-levels and denoise presets for noisy recordings
+* **Test cards** — generate calibrated test images for any mode
 
 ## Install
 
@@ -169,7 +168,8 @@ nsstv decode-all recording.wav --custom-modes-json examples/custom_modes.json
 ```
 
 Output:
-```
+
+```text
 decoded/
 ├── recording_summary.json
 ├── recording_000_PD-180_raw.jpg
@@ -195,7 +195,8 @@ nsstv batch ./recordings --custom-modes-json examples/custom_modes.json
 ```
 
 Output:
-```
+
+```text
 decoded/
 ├── batch_summary.json
 ├── summary.csv
@@ -254,6 +255,137 @@ nsstv live --denoise medium
 nsstv live --image-format png
 ```
 
+---
+
+## Rig control (Hamlib hooks)
+
+nSSTV does not depend on Hamlib — rig control is entirely opt-in via the `RigHooks` dataclass. If you don't pass `rig_hooks`, nothing changes.
+
+### `RigHooks`
+
+```python
+@dataclass
+class RigHooks:
+    before_record:   callable = None  # live RX: tune rig, set mode
+    after_record:    callable = None  # live RX: read back actual frequency
+    before_decode:   callable = None  # any decode: fired before processing
+    after_decode:    callable = None  # any decode: fired after processing
+    before_transmit: callable = None  # encode: PTT key-up
+    after_transmit:  callable = None  # encode: PTT key-down
+```
+
+Each callback receives a `ctx` dict. If it returns a dict, those key/value pairs are merged back into `ctx` so you can pass data forward between hooks.
+
+Anything stored under `ctx["rig"]` ends up in `result["rig"]` on the returned decode/encode result.
+
+### Wiring Hamlib
+
+```python
+import Hamlib
+import nSSTV
+
+rig = Hamlib.Rig(Hamlib.RIG_MODEL_FT817ND)
+rig.set_conf("rig_pathname", "/dev/ttyUSB0")
+rig.set_conf("serial_speed", "9600")
+rig.open()
+
+hooks = nSSTV.RigHooks(
+    # Tune to 14.230 MHz USB before recording starts
+    before_record=lambda ctx: rig.set_freq(
+        Hamlib.RIG_VFO_A,
+        14_230_000,
+    ),
+
+    # Read the actual frequency back and log it in the result
+    after_record=lambda ctx: {
+        "rig": {"freq_hz": rig.get_freq()}
+    },
+
+    # Key up before transmitting
+    before_transmit=lambda ctx: rig.set_ptt(
+        Hamlib.RIG_VFO_A,
+        Hamlib.RIG_PTT_ON,
+    ),
+
+    # Key down when done
+    after_transmit=lambda ctx: rig.set_ptt(
+        Hamlib.RIG_VFO_A,
+        Hamlib.RIG_PTT_OFF,
+    ),
+)
+```
+
+### Live receive
+
+```python
+result = nSSTV.live_record_then_decode(
+    seconds=120,
+    out_base="capture.jpg",
+    rig_hooks=hooks,
+)
+
+# result["rig"]["freq_hz"] contains the frequency
+# read back from the rig
+```
+
+Hook call order for `live_record_then_decode`:
+
+```text
+before_record  →  [audio capture]  →  after_record
+               →  before_decode    →  [decode]  →  after_decode
+```
+
+### Decode a file
+
+```python
+result = nSSTV.decode(
+    "recording.wav",
+    rig_hooks=hooks,
+)
+```
+
+Only `before_decode` and `after_decode` fire here — there is no record step.
+
+### Transmit
+
+```python
+info = nSSTV.encode(
+    "image.jpg",
+    rig_hooks=hooks,
+)
+```
+
+`before_transmit` fires after the WAV is written. `after_transmit` fires immediately after.
+
+Playing the audio out through your sound card interface is your responsibility (for example, `sounddevice`, `aplay`, or any audio player). nSSTV doesn't control playback, so you should key up in `before_transmit`, play the file, then key down in `after_transmit`.
+
+### Using `rigctl` instead of the Python bindings
+
+If `python-hamlib` isn't available on your platform, `rigctl` via subprocess works fine:
+
+```python
+import subprocess
+
+def rigctl(*args, model=361, port="/dev/ttyUSB0"):
+    subprocess.run(
+        ["rigctl", "-m", str(model), "-r", port, *args],
+        check=True,
+        timeout=10,
+    )
+
+hooks = nSSTV.RigHooks(
+    before_record=lambda ctx: rigctl(
+        "M", "USB", "0", "F", "14230000"
+    ),
+    before_transmit=lambda ctx: rigctl("T", "1"),
+    after_transmit=lambda ctx: rigctl("T", "0"),
+)
+```
+
+Hamlib is completely optional. If you don't provide `rig_hooks`, nSSTV behaves exactly as it does without rig control.
+
+---
+
 ## `modes` — List all modes
 
 ```bash
@@ -264,15 +396,15 @@ nsstv modes
 
 ## Output styles (`--output-mode`)
 
-| Style | Preview | Description |
-|-------|---------|-------------|
-| `raw` | <img width="240" alt="raw" src="https://github.com/user-attachments/assets/c39476f5-fa31-4b83-bbbf-b517e91f41b3" /> | Plain decoded image |
-| `polaroid_text` | <img width="240" alt="polaroid_text" src="https://github.com/user-attachments/assets/ab46a3af-c3bd-42f2-81c8-5d1114f2a803" /> | Polaroid border + metadata text |
-| `polaroid_notext` | <img width="240" alt="polaroid_notext" src="https://github.com/user-attachments/assets/03b1d2b2-d8a5-4d84-a653-4aa7b08d09ed" /> | Polaroid border, no text |
-| `spectrogram_text` | <img width="240" alt="spectrogram_text" src="https://github.com/user-attachments/assets/00b658d8-bcb8-4510-a6d6-0b8bf28e3d8d" /> | Image + spectrogram + text |
-| `spectrogram_notext` | <img width="240" alt="spectrogram_notext" src="https://github.com/user-attachments/assets/bc1b9b49-6b7f-4574-b8f4-96fdf4b7e455" /> | Image + spectrogram, no text |
-| `stack` | <img width="240" alt="stack" src="https://github.com/user-attachments/assets/e8d268a8-bd6a-483e-9448-6e6f9959dd05" /> | Image stacked above spectrogram |
-| `all` | — | Every style at once |
+| Style                | Preview                                                                                                                            | Description                     |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| `raw`                | <img width="240" alt="raw" src="https://github.com/user-attachments/assets/c39476f5-fa31-4b83-bbbf-b517e91f41b3" />                | Plain decoded image             |
+| `polaroid_text`      | <img width="240" alt="polaroid_text" src="https://github.com/user-attachments/assets/ab46a3af-c3bd-42f2-81c8-5d1114f2a803" />      | Polaroid border + metadata text |
+| `polaroid_notext`    | <img width="240" alt="polaroid_notext" src="https://github.com/user-attachments/assets/03b1d2b2-d8a5-4d84-a653-4aa7b08d09ed" />    | Polaroid border, no text        |
+| `spectrogram_text`   | <img width="240" alt="spectrogram_text" src="https://github.com/user-attachments/assets/00b658d8-bcb8-4510-a6d6-0b8bf28e3d8d" />   | Image + spectrogram + text      |
+| `spectrogram_notext` | <img width="240" alt="spectrogram_notext" src="https://github.com/user-attachments/assets/bc1b9b49-6b7f-4574-b8f4-96fdf4b7e455" /> | Image + spectrogram, no text    |
+| `stack`              | <img width="240" alt="stack" src="https://github.com/user-attachments/assets/e8d268a8-bd6a-483e-9448-6e6f9959dd05" />              | Image stacked above spectrogram |
+| `all`                | —                                                                                                                                  | Every style at once             |
 
 ```bash
 nsstv decode input.wav --output-mode all
@@ -285,9 +417,9 @@ nsstv decode input.wav --output-mode all
 Every SSTV mode has fixed dimensions (PD-180 is always 640×496), so nSSTV fits
 your photo instead of squashing it:
 
-- `contain` — keep aspect ratio, pad the edges (**default**, no distortion)
-- `cover` — keep aspect ratio, crop to fill
-- `stretch` — squash to fit
+* `contain` — keep aspect ratio, pad the edges (**default**, no distortion)
+* `cover` — keep aspect ratio, crop to fill
+* `stretch` — squash to fit
 
 ```bash
 nsstv encode portrait.jpg --mode PD-180 --fit cover
@@ -301,19 +433,19 @@ nsstv encode portrait.jpg --mode PD-180 --fit contain --background 255,255,255
 Five modes are marked **experimental**. They still encode, decode and show up
 in `nsstv modes` (with an `experimental` tag), but treat their results with care:
 
-| Mode | VIS | Experimental scope |
-|------|-----|--------------------|
-| Pasokon P3 | 113 | everywhere |
-| Pasokon P5 | 114 | everywhere |
-| Pasokon P7 | 115 | everywhere |
-| PD-50 | 93 | everywhere |
-| Scottie DX | 76 | `decode-all` only |
+| Mode       | VIS | Experimental scope |
+| ---------- | --- | ------------------ |
+| Pasokon P3 | 113 | everywhere         |
+| Pasokon P5 | 114 | everywhere         |
+| Pasokon P7 | 115 | everywhere         |
+| PD-50      | 93  | everywhere         |
+| Scottie DX | 76  | `decode-all` only  |
 
-- **Pasokon P3/P5/P7 and PD-50** — the layouts are unverified and decodes may
+* **Pasokon P3/P5/P7 and PD-50** — the layouts are unverified and decodes may
   be unreliable. Their VIS codes stay in the table on purpose: when a Pasokon
   or PD-50 signal appears, nSSTV can name it and say "experimental" instead of
   failing to recognize it.
-- **Scottie DX** — plain encode and decode are fine, but inside `decode-all`
+* **Scottie DX** — plain encode and decode are fine, but inside `decode-all`
   its very long lines make it easy to misjudge in a recording that holds
   several transmissions, so the scanner flags it.
 
@@ -334,7 +466,7 @@ each affected transmission and to the summary.
 ## Picking a mode
 
 ```bash
-nsstv modes            # list all 28
+nsstv modes            # list all modes
 nsstv bench photo.jpg  # rank them by quality on your image
 ```
 
@@ -365,6 +497,7 @@ nSSTV.cut("tx.wav", 16.0)                       # first 16s → tx_cut.wav
 nSSTV.join(["a.wav", "b.wav"], gap=5.0)         # join with silence between
 nSSTV.add_caption_to_image("in.jpg", "out.jpg", text="NANA")
 nSSTV.random_modes(4, seed=7)                   # repeatable random mode pick
+nSSTV.add_callsign_to_image("photo.jpg", "out.jpg", callsign="W1AW", position="bottom-right", opacity=0.7) #add callsign to image
 ```
 
 What `rt()` returns:
@@ -375,8 +508,8 @@ r = nSSTV.rt("photo.jpg")
 r["ok"]             # True/False
 r["mode"]           # mode name
 r["vis_ok"]         # True
-r["wav"]            # path to audio
-r["raw"]            # path to decoded image
+r["wav"]             # path to audio
+r["raw"]             # path to decoded image
 r["comparison"]     # path to comparison PNG
 r["metrics"]        # {"mae": 7.55, "psnr": 27.0, "correlation": 0.96}
 r["quality"]        # {"overall": 1.0, ...}
@@ -401,13 +534,31 @@ nsstv decode input.wav --diagnostics
 
 ```python
 import nSSTV
+
 reg = nSSTV.ModeRegistry()
+
 reg.add_custom_mode(
-    name="My Mode", vis_code=123, width=320, height=240, color="rgb",
-    line_seconds=0.5, sync_seconds=0.005, sync_offset=0.0,
-    channels=(("R", 0.006, 0.16), ("G", 0.166, 0.16), ("B", 0.326, 0.16)),
+    name="My Mode",
+    vis_code=123,
+    width=320,
+    height=240,
+    color="rgb",
+    line_seconds=0.5,
+    sync_seconds=0.005,
+    sync_offset=0.0,
+    channels=(
+        ("R", 0.006, 0.16),
+        ("G", 0.166, 0.16),
+        ("B", 0.326, 0.16),
+    ),
 )
-nSSTV.encode("image.jpg", mode_name="My Mode", registry=reg, wav_out="tx.wav")
+
+nSSTV.encode(
+    "image.jpg",
+    mode_name="My Mode",
+    registry=reg,
+    wav_out="tx.wav",
+)
 ```
 
 Or load from JSON and pass to any command with `--custom-modes-json`.
