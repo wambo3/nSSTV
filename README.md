@@ -109,7 +109,7 @@ sudo apt update && sudo apt install -y ffmpeg libportaudio2
 ## Quick Start
 
 ```python
-import nSSTV
+import nsstv
 
 nSSTV.encode("photo.jpg")           # → photo_sstv.wav
 nSSTV.decode("recording.wav")       # → recording_decoded.png
@@ -121,8 +121,8 @@ nSSTV.bench("photo.jpg")            # try every mode, rank them
 Or from the terminal:
 
 ```bash
-nsstv rt photo.jpg          # test the whole pipeline
-nsstv bench photo.jpg       # find the best mode for your image
+nSSTV rt photo.jpg          # test the whole pipeline
+nSSTV bench photo.jpg       # find the best mode for your image
 ```
 
 ---
@@ -152,7 +152,7 @@ nSSTV.info("decode")                    # docs for one function
 ### 1. Encoding images
 
 ```python
-import nSSTV
+import nsstv
 
 info = nSSTV.encode(
     image_path="photo.jpg",         # REQUIRED
@@ -175,7 +175,7 @@ print("Generated audio duration:", info["duration_seconds"], "seconds")
 `nSSTV.transmit()` keys your transceiver before audio playback begins and guarantees PTT release in a `finally` block.
 
 ```python
-import nSSTV
+import nsstv
 
 # Option A: Hamlib CAT control (rigctl / rigctld)
 rig_hooks = nSSTV.make_rigctl_hooks(
@@ -199,7 +199,7 @@ nSSTV.transmit("photo_sstv.wav", rig_hooks=serial_hooks)
 ### 3. Decoding: single, multi-transmission, and batch
 
 ```python
-import nSSTV
+import nsstv
 
 # Single transmission
 single = nSSTV.decode(
@@ -233,7 +233,7 @@ print("Batch decoded files:", batch["processed_count"])
 ### 4. Continuous soundcard receiver
 
 ```python
-import nSSTV
+import nsstv
 
 nSSTV.live_listen_and_decode(
     out_dir="live_rx_images",  # default "live_decoded"
@@ -246,7 +246,7 @@ nSSTV.live_listen_and_decode(
 ### 5. Direct RTL-SDR receiver
 
 ```python
-import nSSTV
+import nsstv
 
 # 145.800 MHz FM for International Space Station passes
 nSSTV.sdr_listen_and_decode(
@@ -259,7 +259,7 @@ nSSTV.sdr_listen_and_decode(
 ### 6. Roundtrip testing and benchmarking
 
 ```python
-import nSSTV
+import nsstv
 
 # Encode -> decode -> score (MAE, PSNR dB, correlation)
 rt_res = nSSTV.rt(
@@ -293,7 +293,7 @@ r["quality"]        # {"overall": 1.0, ...}
 ### 7. Image comparison
 
 ```python
-import nSSTV
+import nsstv
 
 metrics = nSSTV.compare("original.png", "decoded.png")
 print("MAE:", metrics["mae"], "PSNR:", metrics["psnr"], "dB")
@@ -317,7 +317,7 @@ nSSTV.add_callsign_to_image(
 ### 9. Raspberry Pi background service
 
 ```python
-import nSSTV
+import nsstv
 
 service_unit = nSSTV.make_rpi_systemd_service(
     service_name="nsstv-rx",
@@ -351,22 +351,22 @@ WantedBy=multi-user.target
 
 ## Command Line Interface
 
-Every command runs as `nsstv <command>` or `python3 -m nsstv <command>`. The two you will use most are **`rt`** (test the whole pipeline) and **`bench`** (find the best mode).
+Every command runs as `nSSTV <command>` or `python3 -m nsstv <command>`. The two you will use most are **`rt`** (test the whole pipeline) and **`bench`** (find the best mode).
 
 ### `rt`: roundtrip
 
 Encode → decode → metrics → comparison PNG. The best starting point.
 
 ```bash
-nsstv rt photo.jpg
-nsstv rt photo.jpg --mode PD-180
-nsstv rt photo.jpg --fit cover
-nsstv rt photo.jpg --output-mode all
-nsstv rt photo.jpg --output-mode stack
-nsstv rt photo.jpg --image-format png
-nsstv rt photo.jpg --denoise light
-nsstv rt photo.jpg --auto-levels
-nsstv rt photo.jpg --no-comparison
+nSSTV rt photo.jpg
+nSSTV rt photo.jpg --mode PD-180
+nSSTV rt photo.jpg --fit cover
+nSSTV rt photo.jpg --output-mode all
+nSSTV rt photo.jpg --output-mode stack
+nSSTV rt photo.jpg --image-format png
+nSSTV rt photo.jpg --denoise light
+nSSTV rt photo.jpg --auto-levels
+nSSTV rt photo.jpg --no-comparison
 ```
 
 ### `bench`: benchmark every mode
@@ -374,69 +374,69 @@ nsstv rt photo.jpg --no-comparison
 Runs `rt` across every mode, ranks the results, flags weak ones, and writes `bench.json` and `bench.csv`.
 
 ```bash
-nsstv bench photo.jpg
-nsstv bench photo.jpg --modes random             # 5 random modes
-nsstv bench photo.jpg --modes random --count 3   # 3 random modes
-nsstv bench photo.jpg --modes random --seed 7    # repeatable pick
-nsstv bench photo.jpg --modes 3                  # same as random --count 3
-nsstv bench photo.jpg --modes "PD-50"            # bench one experimental mode
-nsstv bench photo.jpg --include-experimental     # include experimental modes
+nSSTV bench photo.jpg
+nSSTV bench photo.jpg --modes random             # 5 random modes
+nSSTV bench photo.jpg --modes random --count 3   # 3 random modes
+nSSTV bench photo.jpg --modes random --seed 7    # repeatable pick
+nSSTV bench photo.jpg --modes 3                  # same as random --count 3
+nSSTV bench photo.jpg --modes "PD-50"            # bench one experimental mode
+nSSTV bench photo.jpg --include-experimental     # include experimental modes
 ```
 
 ### `encode`: image → WAV/MP3
 
 ```bash
-nsstv encode image.jpg
-nsstv encode image.jpg --mode PD-180
-nsstv encode image.jpg --wav-out encoded.wav
-nsstv encode image.jpg --mp3-out encoded.mp3
-nsstv encode image.jpg --mp3-bitrate 320k
-nsstv encode image.jpg --fit contain             # default: letterbox, no distortion
-nsstv encode image.jpg --fit cover               # crop to fill frame
-nsstv encode image.jpg --fit stretch             # squash
-nsstv encode image.jpg --background 255,255,255  # white padding instead of black
-nsstv encode image.jpg --callsign W1AW
-nsstv encode image.jpg --caption "Test - PD-180"
-nsstv encode image.jpg --caption "Test" --caption-position top
-nsstv encode image.jpg --caption "Test" --caption-position bottom
-nsstv encode image.jpg --no-vis                  # skip VIS header tones
-nsstv encode image.jpg --sample-rate 48000
-nsstv encode image.jpg --amplitude 0.80
-nsstv encode image.jpg --custom-modes-json examples/custom_modes.json
+nSSTV encode image.jpg
+nSSTV encode image.jpg --mode PD-180
+nSSTV encode image.jpg --wav-out encoded.wav
+nSSTV encode image.jpg --mp3-out encoded.mp3
+nSSTV encode image.jpg --mp3-bitrate 320k
+nSSTV encode image.jpg --fit contain             # default: letterbox, no distortion
+nSSTV encode image.jpg --fit cover               # crop to fill frame
+nSSTV encode image.jpg --fit stretch             # squash
+nSSTV encode image.jpg --background 255,255,255  # white padding instead of black
+nSSTV encode image.jpg --callsign W1AW
+nSSTV encode image.jpg --caption "Test - PD-180"
+nSSTV encode image.jpg --caption "Test" --caption-position top
+nSSTV encode image.jpg --caption "Test" --caption-position bottom
+nSSTV encode image.jpg --no-vis                  # skip VIS header tones
+nSSTV encode image.jpg --sample-rate 48000
+nSSTV encode image.jpg --amplitude 0.80
+nSSTV encode image.jpg --custom-modes-json examples/custom_modes.json
 ```
 
 ### `transmit`: key the radio and send
 
 ```bash
 # Raspberry Pi GPIO PTT
-nsstv transmit photo.jpg --mode "Martin M1" --gpio-pin 17
+nSSTV transmit photo.jpg --mode "Martin M1" --gpio-pin 17
 
 # Hamlib CAT control
-nsstv transmit photo.jpg --mode "PD-180" --rig-model 2024 --rig-file /dev/ttyUSB0
+nSSTV transmit photo.jpg --mode "PD-180" --rig-model 2024 --rig-file /dev/ttyUSB0
 ```
 
 ### `decode`: WAV/MP3 → image
 
 ```bash
-nsstv decode input.wav
-nsstv decode input.mp3
-nsstv decode input.wav --out-base output.jpg
-nsstv decode input.wav --out-base output.png --image-format png
-nsstv decode input.wav --output-mode raw
-nsstv decode input.wav --output-mode polaroid_text
-nsstv decode input.wav --output-mode polaroid_notext
-nsstv decode input.wav --output-mode spectrogram_text
-nsstv decode input.wav --output-mode spectrogram_notext
-nsstv decode input.wav --output-mode stack
-nsstv decode input.wav --output-mode all
-nsstv decode input.wav --auto-levels
-nsstv decode input.wav --denoise off|light|medium|strong
-nsstv decode input.wav --diagnostics             # spectrogram with markers
-nsstv decode input.wav --report report.json      # full JSON decode report
-nsstv decode input.wav --no-sidecar              # skip .json sidecars
-nsstv decode input.wav --force-mode "Martin M1"  # skip VIS detection
-nsstv decode input.wav --slant-search 0.03       # line-timing search (default 0.03)
-nsstv decode input.wav --custom-modes-json examples/custom_modes.json
+nSSTV decode input.wav
+nSSTV decode input.mp3
+nSSTV decode input.wav --out-base output.jpg
+nSSTV decode input.wav --out-base output.png --image-format png
+nSSTV decode input.wav --output-mode raw
+nSSTV decode input.wav --output-mode polaroid_text
+nSSTV decode input.wav --output-mode polaroid_notext
+nSSTV decode input.wav --output-mode spectrogram_text
+nSSTV decode input.wav --output-mode spectrogram_notext
+nSSTV decode input.wav --output-mode stack
+nSSTV decode input.wav --output-mode all
+nSSTV decode input.wav --auto-levels
+nSSTV decode input.wav --denoise off|light|medium|strong
+nSSTV decode input.wav --diagnostics             # spectrogram with markers
+nSSTV decode input.wav --report report.json      # full JSON decode report
+nSSTV decode input.wav --no-sidecar              # skip .json sidecars
+nSSTV decode input.wav --force-mode "Martin M1"  # skip VIS detection
+nSSTV decode input.wav --slant-search 0.03       # line-timing search (default 0.03)
+nSSTV decode input.wav --custom-modes-json examples/custom_modes.json
 ```
 
 ### `decode-all`: every image in one recording
@@ -444,18 +444,18 @@ nsstv decode input.wav --custom-modes-json examples/custom_modes.json
 Finds and decodes every transmission inside one long WAV/MP3.
 
 ```bash
-nsstv decode-all recording.wav
-nsstv decode-all recording.wav --out-dir decoded
-nsstv decode-all recording.wav --out-dir decoded --output-mode all
-nsstv decode-all recording.wav --image-format png
-nsstv decode-all recording.wav --auto-levels
-nsstv decode-all recording.wav --denoise medium
-nsstv decode-all recording.wav --diagnostics
-nsstv decode-all recording.wav --no-sidecar
-nsstv decode-all recording.wav --report report.json
-nsstv decode-all recording.wav --force-mode "Martin M1"
-nsstv decode-all recording.wav --slant-search 0.03
-nsstv decode-all recording.wav --custom-modes-json examples/custom_modes.json
+nSSTV decode-all recording.wav
+nSSTV decode-all recording.wav --out-dir decoded
+nSSTV decode-all recording.wav --out-dir decoded --output-mode all
+nSSTV decode-all recording.wav --image-format png
+nSSTV decode-all recording.wav --auto-levels
+nSSTV decode-all recording.wav --denoise medium
+nSSTV decode-all recording.wav --diagnostics
+nSSTV decode-all recording.wav --no-sidecar
+nSSTV decode-all recording.wav --report report.json
+nSSTV decode-all recording.wav --force-mode "Martin M1"
+nSSTV decode-all recording.wav --slant-search 0.03
+nSSTV decode-all recording.wav --custom-modes-json examples/custom_modes.json
 ```
 
 Output:
@@ -472,17 +472,17 @@ decoded/
 ### `batch`: decode a whole folder
 
 ```bash
-nsstv batch ./recordings
-nsstv batch ./recordings --out-dir ./decoded
-nsstv batch ./recordings --out-dir ./decoded --output-mode all
-nsstv batch ./recordings --image-format png
-nsstv batch ./recordings --auto-levels
-nsstv batch ./recordings --denoise light
-nsstv batch ./recordings --diagnostics
-nsstv batch ./recordings --no-sidecar
-nsstv batch ./recordings --no-recursive          # don't search subfolders
-nsstv batch ./recordings --stop-on-error
-nsstv batch ./recordings --custom-modes-json examples/custom_modes.json
+nSSTV batch ./recordings
+nSSTV batch ./recordings --out-dir ./decoded
+nSSTV batch ./recordings --out-dir ./decoded --output-mode all
+nSSTV batch ./recordings --image-format png
+nSSTV batch ./recordings --auto-levels
+nSSTV batch ./recordings --denoise light
+nSSTV batch ./recordings --diagnostics
+nSSTV batch ./recordings --no-sidecar
+nSSTV batch ./recordings --no-recursive          # don't search subfolders
+nSSTV batch ./recordings --stop-on-error
+nSSTV batch ./recordings --custom-modes-json examples/custom_modes.json
 ```
 
 Output:
@@ -502,46 +502,46 @@ decoded/
 Requires `pip install "nSSTV[live]"`.
 
 ```bash
-nsstv live
-nsstv live --seconds 240
-nsstv live --seconds 240 --out-base live_record.jpg
-nsstv live --out-base live.jpg --diagnostics
-nsstv live --device 2                            # specific audio device index
-nsstv live --output-mode all
-nsstv live --auto-levels
-nsstv live --denoise medium
-nsstv live --image-format png
+nSSTV live
+nSSTV live --seconds 240
+nSSTV live --seconds 240 --out-base live_record.jpg
+nSSTV live --out-base live.jpg --diagnostics
+nSSTV live --device 2                            # specific audio device index
+nSSTV live --output-mode all
+nSSTV live --auto-levels
+nSSTV live --denoise medium
+nSSTV live --image-format png
 ```
 
 ### `listen` / `live-listen`: continuous receiver
 
 ```bash
-nsstv listen --out-dir live_rx --sample-rate 48000
-nsstv live-listen --out-dir live_rx --sample-rate 48000   # alias
+nSSTV listen --out-dir live_rx --sample-rate 48000
+nSSTV live-listen --out-dir live_rx --sample-rate 48000   # alias
 ```
 
 ### `roundtrip`: decode audio, then re-encode it
 
 ```bash
-nsstv roundtrip input.wav
-nsstv roundtrip input.wav --out-dir decoded
-nsstv roundtrip input.wav --encoded-wav-out roundtrip.wav
+nSSTV roundtrip input.wav
+nSSTV roundtrip input.wav --out-dir decoded
+nSSTV roundtrip input.wav --encoded-wav-out roundtrip.wav
 ```
 
 ### `compare`, `side`, `fit`
 
 ```bash
-nsstv compare original.png decoded.png          # MAE, PSNR, correlation
-nsstv side original.png decoded.png --out side.png
-nsstv fit photo.jpg --mode PD-180 --how cover   # preview image fit
+nSSTV compare original.png decoded.png          # MAE, PSNR, correlation
+nSSTV side original.png decoded.png --out side.png
+nSSTV fit photo.jpg --mode PD-180 --how cover   # preview image fit
 ```
 
 ### `testcard` / `card`: calibrated test card
 
 ```bash
-nsstv testcard --mode PD-180
-nsstv testcard --mode "Scottie S1" --out testcard.png
-nsstv card --mode PD-180 --out testcard.png     # same thing
+nSSTV testcard --mode PD-180
+nSSTV testcard --mode "Scottie S1" --out testcard.png
+nSSTV card --mode PD-180 --out testcard.png     # same thing
 ```
 
 <p align="center">
@@ -551,16 +551,16 @@ nsstv card --mode PD-180 --out testcard.png     # same thing
 ### `modes`: list all modes and VIS codes
 
 ```bash
-nsstv modes
+nSSTV modes
 ```
 
 ### Script mode (environment variables)
 
-Run `nsstv` with no arguments and it reads its configuration from the environment:
+Run `nSSTV` with no arguments and it reads its configuration from the environment:
 
 ```bash
-NSSTV_ACTION=decode NSSTV_AUDIO_INPUT=input.wav nsstv
-NSSTV_ACTION=encode NSSTV_IMAGE_INPUT=image.jpg nsstv
+NSSTV_ACTION=decode NSSTV_AUDIO_INPUT=input.wav nSSTV
+NSSTV_ACTION=encode NSSTV_IMAGE_INPUT=image.jpg nSSTV
 
 NSSTV_ACTION=batch \
 NSSTV_WORKDIR=./recordings \
@@ -569,7 +569,7 @@ NSSTV_IMAGE_FORMAT=png \
 NSSTV_DIAGNOSTICS=1 \
 NSSTV_AUTO_LEVELS=1 \
 NSSTV_DENOISE=medium \
-nsstv
+nSSTV
 ```
 
 Key variables: `NSSTV_ACTION`, `NSSTV_AUDIO_INPUT`, `NSSTV_IMAGE_INPUT`, `NSSTV_OUTPUT_BASE`, `NSSTV_OUT_DIR`, `NSSTV_WORKDIR`, `NSSTV_IMAGE_FORMAT`, `NSSTV_OUTPUT_MODE`, `NSSTV_ENCODE_MODE`, `NSSTV_CAPTION`, `NSSTV_IMAGE_FIT`, `NSSTV_DENOISE`, `NSSTV_AUTO_LEVELS`, `NSSTV_DIAGNOSTICS`, `NSSTV_SAMPLE_RATE`, `NSSTV_LIVE_SECONDS`, `NSSTV_CUSTOM_MODES_JSON`. Full list: `nSSTV.info("cli")`.
@@ -593,7 +593,7 @@ Key variables: `NSSTV_ACTION`, `NSSTV_AUDIO_INPUT`, `NSSTV_IMAGE_INPUT`, `NSSTV_
 The short aliases `polaroid` and `spectrogram` are also accepted in the Python API.
 
 ```bash
-nsstv decode input.wav --output-mode all
+nSSTV decode input.wav --output-mode all
 ```
 
 ### Image fit (`--fit` / `image_fit`)
@@ -605,8 +605,8 @@ Every SSTV mode has fixed dimensions (PD-180 is always 640×496), so nSSTV fits 
 - **`stretch`**: distort the image to the exact frame dimensions.
 
 ```bash
-nsstv encode portrait.jpg --mode PD-180 --fit cover
-nsstv encode portrait.jpg --mode PD-180 --fit contain --background 255,255,255
+nSSTV encode portrait.jpg --mode PD-180 --fit cover
+nSSTV encode portrait.jpg --mode PD-180 --fit contain --background 255,255,255
 ```
 
 ---
@@ -620,7 +620,7 @@ Add `--diagnostics` (or `diagnostics=True`) to any decode for a spectrogram anno
 </p>
 
 ```bash
-nsstv decode input.wav --diagnostics
+nSSTV decode input.wav --diagnostics
 ```
 
 ---
@@ -630,7 +630,7 @@ nsstv decode input.wav --diagnostics
 Stamp station details onto an image before transmission. Templates support `{callsign}`, `{grid}`, timestamp, frequency, and mode tags.
 
 ```python
-import nSSTV
+import nsstv
 
 overlays = [
     nSSTV.TextOverlay(
@@ -691,7 +691,7 @@ Each callback receives a `ctx` dict. If it returns a dict, those key/value pairs
 
 ```python
 import Hamlib
-import nSSTV
+import nsstv
 
 rig = Hamlib.Rig(Hamlib.RIG_MODEL_FT817ND)
 rig.set_conf("rig_pathname", "/dev/ttyUSB0")
@@ -719,7 +719,7 @@ If `python-hamlib` is not available on your platform, `rigctl` via subprocess wo
 
 ```python
 import subprocess
-import nSSTV
+import nsstv
 
 def rigctl(*args, model=361, port="/dev/ttyUSB0"):
     subprocess.run(
@@ -777,7 +777,7 @@ info = nSSTV.encode("image.jpg", rig_hooks=hooks)
 Define your own mode in Python:
 
 ```python
-import nSSTV
+import nsstv
 
 reg = nSSTV.ModeRegistry()
 
@@ -831,11 +831,11 @@ Or load modes from a JSON file and pass it to any command with `--custom-modes-j
 | **Pasokon** | P3, P5, P7 | 640×496 | Variable | 0x71 to 0x73 | *Experimental* |
 | **Wraase** | SC-180 | 320×256 | 705.0 ms | 0x37 | Classic 180 s RGB mode |
 
-Run `nsstv modes` for the live list, or `nsstv bench photo.jpg` to rank modes by quality on your own image.
+Run `nSSTV modes` for the live list, or `nSSTV bench photo.jpg` to rank modes by quality on your own image.
 
 ### Experimental modes
 
-Five modes are marked **experimental**. They still encode, decode, and appear in `nsstv modes` (tagged `experimental`), but treat their results with care.
+Five modes are marked **experimental**. They still encode, decode, and appear in `nSSTV modes` (tagged `experimental`), but treat their results with care.
 
 | Mode | VIS | Experimental scope |
 | :--- | :--- | :--- |
