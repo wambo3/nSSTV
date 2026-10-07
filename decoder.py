@@ -534,6 +534,7 @@ def decode_all_audio_to_images(
         diagnostics=False,
         min_gap_seconds=1.0,
         line_structure="auto",
+        slant_mode="auto",
         forced_mode_name=None,
         report_path=None,
 ):
@@ -639,6 +640,7 @@ def decode_all_audio_to_images(
             denoise=denoise,
             write_sidecar=write_sidecar,
             line_structure=line_structure,
+            slant_mode=slant_mode,
             extra_metadata={
                 "transmission_index": index,
                 "multi_decode": True,
@@ -739,6 +741,8 @@ def batch_decode(
         write_sidecar=True,
         diagnostics=False,
         continue_on_error=True,
+        line_structure="auto",
+        slant_mode="auto",
 ):
     """
     Batch decode all WAV/MP3 files in a directory.
@@ -791,6 +795,8 @@ def batch_decode(
                 denoise=denoise,
                 write_sidecar=write_sidecar,
                 diagnostics=diagnostics,
+                line_structure=line_structure,
+                slant_mode=slant_mode,
             )
             results.append(info)
         except Exception as e:
@@ -1018,25 +1024,12 @@ def estimate_decode_quality(detect_info, image_info):
 
 
 def _hint_modes_from_detect(detect):
-    """Mode names the measured line rate vouches for, best first."""
     lr = detect.get("line_rate") or {}
     return [c["mode_name"] for c in (lr.get("line_rate_candidates") or [])
             if c.get("mode_name")]
 
 
 def _single_confident_hint_mode(detect, min_confidence=0.9):
-    """
-    The one experimental mode name to retry with, or None.
-
-    Auto-retry is limited to the experimental modes (Pasokon P3/P5/P7,
-    PD-50): their off-air recordings are exactly the case that motivated
-    the line-rate hint - VIS header too noisy to score, image otherwise
-    decodable - and the result is flagged experimental either way.
-    Established modes keep the old contract: the hint is reported and the
-    caller decides. Pairs that share a line time (Martin M1/M3, Scottie
-    S1/S3, ...) never trigger a retry either: two candidates means the
-    caller still gets the hint but no guess.
-    """
     lr = detect.get("line_rate") or {}
     cands = lr.get("line_rate_candidates") or []
 
@@ -1051,4 +1044,3 @@ def _single_confident_hint_mode(detect, min_confidence=0.9):
 
 def dec(*args, **kwargs):
     return decode(*args, **kwargs)
-
